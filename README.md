@@ -19,7 +19,7 @@ KOBO_KF_URL=https://kf.kobotoolbox.org
 
 ## Vercel
 
-1. Import this GitHub repo in [Vercel](https://vercel.com).
+1. Import this GitHub repo in [Vercel](https://vercel.com). Framework: Python / Flask (`app.py`).
 2. Add environment variables:
    - `KOBO_TOKEN` — same Kobo API token
    - `KOBO_KF_URL` — `https://kf.kobotoolbox.org`
