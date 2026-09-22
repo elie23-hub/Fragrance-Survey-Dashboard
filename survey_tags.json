@@ -1,0 +1,102 @@
+{
+  "brands": {
+    "A": {
+      "control": "A1",
+      "experimental": "A2"
+    },
+    "B": {
+      "control": "B1",
+      "experimental": "B2"
+    },
+    "C": {
+      "control": "C1",
+      "experimental": "C2"
+    },
+    "D": {
+      "control": "D1",
+      "experimental": "D2"
+    },
+    "E": {
+      "control": "E1",
+      "experimental": "E2"
+    },
+    "F": {
+      "control": "F1",
+      "experimental": "F2"
+    }
+  },
+  "surveys": {
+    "A1": {
+      "uid": "aknzN8RGEMVM2QnEoPwDfD",
+      "brand": "A",
+      "arm": "control",
+      "kobo_name": "Fragrance Survey"
+    },
+    "A2": {
+      "uid": "a7sqkgBP4ohpjM9wAqBx5X",
+      "brand": "A",
+      "arm": "experimental",
+      "kobo_name": "Fragrance Survey"
+    },
+    "B1": {
+      "uid": "at8JK3TsmZ7GNwAdh6MMZN",
+      "brand": "B",
+      "arm": "control",
+      "kobo_name": "Fragrance Survey"
+    },
+    "B2": {
+      "uid": "ayT9KgqZZhRoGWrM7aD6e3",
+      "brand": "B",
+      "arm": "experimental",
+      "kobo_name": "Fragrance Survey"
+    },
+    "C1": {
+      "uid": "aSSnLn44xCHYPps8ncKTd2",
+      "brand": "C",
+      "arm": "control",
+      "kobo_name": "Fragrance Survey"
+    },
+    "C2": {
+      "uid": "aRYBZSEUWfL5RatVF4FLuF",
+      "brand": "C",
+      "arm": "experimental",
+      "kobo_name": "Fragrance Survey"
+    },
+    "D1": {
+      "uid": "aA8yKYfZac8LrNwsa723b6",
+      "brand": "D",
+      "arm": "control",
+      "kobo_name": "Fragrance Survey"
+    },
+    "D2": {
+      "uid": "aD4MSqH9BKkDcrY4ZKGS5M",
+      "brand": "D",
+      "arm": "experimental",
+      "kobo_name": "Fragrance Survey"
+    },
+    "E1": {
+      "uid": "astg2Yg45D7ZDAqYpo8hoC",
+      "brand": "E",
+      "arm": "control",
+      "kobo_name": "Fragrance Survey"
+    },
+    "E2": {
+      "uid": "ahM6PQKGGR3SCrDPk843yp",
+      "brand": "E",
+      "arm": "experimental",
+      "kobo_name": "Fragrance Survey"
+    },
+    "F1": {
+      "uid": "a55kQWxRsx3XkQMJDEeqrJ",
+      "brand": "F",
+      "arm": "control",
+      "kobo_name": "Fragrance Survey"
+    },
+    "F2": {
+      "uid": "atrncufeVxVigRJqR7QNyY",
+      "brand": "F",
+      "arm": "experimental",
+      "kobo_name": "Fragrance Survey"
+    }
+  }
+}

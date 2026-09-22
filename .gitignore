@@ -1,0 +1,10 @@
+.env
+.env.*
+!.env.example
+.vscode/
+.venv/
+__pycache__/
+*.pyc
+.idea/
+inspect_forms_output.txt
+output/

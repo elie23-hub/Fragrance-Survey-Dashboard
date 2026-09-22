@@ -1,0 +1,10 @@
+{
+  "rewrites": [
+    { "source": "/api/dashboard", "destination": "/api/dashboard.py" }
+  ],
+  "functions": {
+    "api/dashboard.py": {
+      "maxDuration": 60
+    }
+  }
+}
