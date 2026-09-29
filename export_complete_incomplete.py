@@ -69,16 +69,45 @@ def classify(frame):
     return out, complete
 
 
+def _percentages_to_100(counts: list[int], decimals: int = 1) -> list[float]:
+    """Round to `decimals` so displayed percents sum to 100.0 exactly."""
+    n = len(counts)
+    total = int(sum(counts))
+    if n == 0:
+        return []
+    if total <= 0:
+        return [0.0] * n
+    factor = 10 ** decimals
+    scaled = 100 * factor
+    units = [(count * scaled) // total for count in counts]
+    leftover = scaled - sum(units)
+    order = sorted(
+        range(n),
+        key=lambda i: ((counts[i] * scaled) % total, counts[i]),
+        reverse=True,
+    )
+    for i in order:
+        if leftover <= 0:
+            break
+        if counts[i] == 0:
+            continue
+        units[i] += 1
+        leftover -= 1
+    if leftover:
+        for i in order:
+            if leftover <= 0:
+                break
+            units[i] += 1
+            leftover -= 1
+    return [u / factor for u in units]
+
+
 def freq(series, codes: list[str], labels: dict[str, str]) -> list[tuple[str, int, float]]:
-    total = int(len(series))
-    rows = []
-    for code in codes:
-        count = int(series.eq(code).sum())
-        rows.append((labels[code], count, round((count / total) * 100, 1) if total else 0.0))
-    missing = int(series.isna().sum() + (series.astype(str).isin({"", "nan", "None"})).sum())
-    # na already counted in isna; avoid double-count of string nan
-    missing = int(series.isna().sum())
-    rows.append(("Not asked", missing, round((missing / total) * 100, 1) if total else 0.0))
+    counts = [int(series.eq(code).sum()) for code in codes]
+    counts.append(int(series.isna().sum()))
+    pcts = _percentages_to_100(counts)
+    rows = [(labels[code], counts[i], pcts[i]) for i, code in enumerate(codes)]
+    rows.append(("Not asked", counts[-1], pcts[-1]))
     return rows
 
 
@@ -134,17 +163,26 @@ def write_frequency_table(ws, start_row: int, title: str, rows: list[tuple[str, 
         write_cell(ws, i, 3, pct / 100, fill=WHITE, number="0.0%")
     total_row = start_row + 2 + len(rows)
     total_count = sum(count for _, count, _ in rows)
+    total_pct = sum(pct for _, _, pct in rows)
     write_cell(ws, total_row, 1, "Total", fill=CREAM, font=Font(name="Calibri", bold=True), align=Alignment(horizontal="left"))
     write_cell(ws, total_row, 2, total_count, fill=CREAM, font=Font(name="Calibri", bold=True))
-    write_cell(ws, total_row, 3, 1 if total_count else 0, fill=CREAM, font=Font(name="Calibri", bold=True), number="0.0%")
+    write_cell(
+        ws,
+        total_row,
+        3,
+        (total_pct / 100) if total_count else 0,
+        fill=CREAM,
+        font=Font(name="Calibri", bold=True),
+        number="0.0%",
+    )
     return total_row + 1
 
 
 def _question_values(rows: list[tuple[str, int, float]], take: int) -> list[tuple[int, float]]:
-    picked = [(count, pct) for _, count, pct in rows[:take]]
-    total = sum(count for count, _ in picked)
-    base = total if total else 0
-    return picked + [(total, 100.0 if base else 0.0)]
+    counts = [count for _, count, _ in rows[:take]]
+    pcts = _percentages_to_100(counts)
+    total = sum(counts)
+    return list(zip(counts, pcts)) + [(total, 100.0 if total else 0.0)]
 
 
 def write_survey_grid(ws, start_row: int, brand: str, group) -> int:
@@ -225,19 +263,19 @@ def _reason_rows(scoped) -> list[tuple[str, int, float]]:
         "Did not finish after qualifying",
         "Did not finish",
     ]
-    rows = []
+    pairs: list[tuple[str, int]] = []
     seen: set[str] = set()
     for label in order:
         if label not in counts.index:
             continue
-        count = int(counts[label])
-        rows.append((label, count, round((count / total) * 100, 1)))
+        pairs.append((label, int(counts[label])))
         seen.add(label)
     for label, count in counts.items():
         if str(label) in seen:
             continue
-        rows.append((str(label), int(count), round((int(count) / total) * 100, 1)))
-    return rows
+        pairs.append((str(label), int(count)))
+    pcts = _percentages_to_100([count for _, count in pairs])
+    return [(label, count, pct) for (label, count), pct in zip(pairs, pcts)]
 
 
 def write_sheet(wb, name: str, scoped, universe_n: int, pulled_at: str):
