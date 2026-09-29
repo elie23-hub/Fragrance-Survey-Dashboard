@@ -82,6 +82,25 @@ def freq(series, codes: list[str], labels: dict[str, str]) -> list[tuple[str, in
     return rows
 
 
+def _answer_label(question: str, value) -> str:
+    if value is None:
+        return "Not asked"
+    text = str(value).strip()
+    if text.endswith(".0"):
+        text = text[:-2]
+    if not text or text.lower() in {"nan", "none"}:
+        return "Not asked"
+    return QUESTION_META[question]["labels"].get(text, "Not asked")
+
+
+def _cell_label(rec) -> str:
+    raw = rec.get("cell") or rec.get("arm") or ""
+    text = str(raw).strip()
+    if not text or text.lower() in {"nan", "none"}:
+        return ""
+    return text.replace("_", " ").title()
+
+
 def write_cell(ws, row, col, value, fill=None, font=None, align=None, number=None):
     cell = ws.cell(row, col, value)
     cell.border = THIN
@@ -141,7 +160,7 @@ def write_survey_grid(ws, start_row: int, brand: str, group) -> int:
         + ["Total"]
     )
     last_col = 21
-    write_cell(ws, start_row, 1, f"Fragrance Survey · Brand {brand}", fill=HEADER, font=WHITE_FONT, align=Alignment(horizontal="left"))
+    write_cell(ws, start_row, 1, f"Fragrance Survey · Survey {brand}", fill=HEADER, font=WHITE_FONT, align=Alignment(horizontal="left"))
     ws.merge_cells(start_row=start_row, start_column=1, end_row=start_row, end_column=last_col)
     write_cell(ws, start_row + 1, 1, "", fill=CREAM)
     write_cell(
@@ -194,55 +213,78 @@ def write_survey_grid(ws, start_row: int, brand: str, group) -> int:
     return start_row + 7
 
 
+def _reason_rows(scoped) -> list[tuple[str, int, float]]:
+    total = int(len(scoped))
+    if not total:
+        return []
+    counts = scoped["status_reason"].value_counts()
+    order = [
+        "Terminated · age out of range",
+        "Terminated · male",
+        "Terminated · no fragrance in last 3 months",
+        "Did not finish after qualifying",
+        "Did not finish",
+    ]
+    rows = []
+    seen: set[str] = set()
+    for label in order:
+        if label not in counts.index:
+            continue
+        count = int(counts[label])
+        rows.append((label, count, round((count / total) * 100, 1)))
+        seen.add(label)
+    for label, count in counts.items():
+        if str(label) in seen:
+            continue
+        rows.append((str(label), int(count), round((int(count) / total) * 100, 1)))
+    return rows
+
+
 def write_sheet(wb, name: str, scoped, universe_n: int, pulled_at: str):
+    del universe_n, pulled_at
     ws = wb.create_sheet(name)
     ws.sheet_view.showGridLines = False
     ws["A1"] = f"{name} interviews"
     ws["A1"].font = TITLE
     ws.merge_cells("A1:G1")
-    ws["A2"] = (
-        f"{len(scoped)} {name.lower()} rows out of {universe_n} live Kobo submissions. "
-        f"Pulled {pulled_at}. Complete = reached Q10 (end of interview). "
-        "Incomplete = terminated on S1/S2/S3 or did not finish."
-    )
-    ws["A2"].font = SUB
-    ws.merge_cells("A2:U2")
     ws.row_dimensions[1].height = 24
-    ws.row_dimensions[2].height = 32
 
-    write_cell(ws, 4, 1, "Complete / incomplete count", fill=HEADER, font=WHITE_FONT, align=Alignment(horizontal="left"))
-    ws.merge_cells("A4:C4")
-    write_cell(ws, 5, 1, "Rows", fill=CREAM, font=Font(name="Calibri", bold=True))
-    write_cell(ws, 5, 2, len(scoped), fill=WHITE)
-    write_cell(ws, 5, 3, (len(scoped) / universe_n) if universe_n else 0, fill=WHITE, number="0.0%")
+    count_label = "Complete count" if name == "Complete" else "incomplete count"
+    write_cell(ws, 3, 1, count_label, fill=HEADER, font=WHITE_FONT, align=Alignment(horizontal="left"))
+    ws.merge_cells("A3:C3")
+    write_cell(ws, 4, 1, "Respondents", fill=CREAM, font=Font(name="Calibri", bold=True), align=Alignment(horizontal="left"))
+    write_cell(ws, 4, 2, len(scoped), fill=WHITE)
+    if name == "Incomplete":
+        ws.merge_cells("B4:C4")
 
-    row = 7
-    row = write_frequency_table(ws, row, "Gender · all brands", freq(scoped["S2"], GENDER_ORDER, QUESTION_META["S2"]["labels"]))
-    row += 1
-    row = write_frequency_table(ws, row, "Age · all brands", freq(scoped["S1"], AGE_ORDER, QUESTION_META["S1"]["labels"]))
-    row += 1
-    if name == "Incomplete" and len(scoped):
-        reasons = scoped["status_reason"].value_counts()
-        reason_rows = [(label, int(count), round((int(count) / len(scoped)) * 100, 1)) for label, count in reasons.items()]
-        row = write_frequency_table(ws, row, "Why the interview stopped", reason_rows)
+    row = 6
+    if name == "Complete":
+        empty_s2 = scoped["S2"] if "S2" in scoped.columns else scoped.iloc[0:0]
+        empty_s1 = scoped["S1"] if "S1" in scoped.columns else scoped.iloc[0:0]
+        row = write_frequency_table(ws, row, "Gender · all Surveys", freq(empty_s2, GENDER_ORDER, QUESTION_META["S2"]["labels"]))
+        row += 1
+        row = write_frequency_table(ws, row, "Age · all Surveys", freq(empty_s1, AGE_ORDER, QUESTION_META["S1"]["labels"]))
+        row += 1
+        tag_map = load_tag_map()
+        for brand in tag_map.get("brands") or {}:
+            group = scoped[scoped["brand"] == brand] if len(scoped) else scoped.iloc[0:0]
+            row = write_survey_grid(ws, row, brand, group)
+            row += 1
+        row += 1
+    else:
+        row = write_frequency_table(ws, row, "Why the interview stopped", _reason_rows(scoped))
         row += 1
 
-    tag_map = load_tag_map()
-    for brand in tag_map.get("brands") or {}:
-        group = scoped[scoped["brand"] == brand] if len(scoped) else scoped.iloc[0:0]
-        row = write_survey_grid(ws, row, brand, group)
-        row += 1
-
-    row += 1
     write_cell(ws, row, 1, "Respondent list", fill=HEADER, font=WHITE_FONT, align=Alignment(horizontal="left"))
-    ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=8)
-    headers = ["Submitted", "Brand", "Arm", "Cell", "Age", "Gender", "Fragrance 3 months", "Status"]
+    ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=7)
+    headers = ["Submitted", "Survey", "Cell", "Age", "Gender", "Fragrance 3 months", "Status"]
     for i, label in enumerate(headers, start=1):
         write_cell(ws, row + 1, i, label, fill=CREAM, font=Font(name="Calibri", bold=True))
-    listing = scoped.sort_values(["brand", "arm", "_submission_time"], na_position="last") if len(scoped) else scoped
+    sort_cols = [col for col in ("brand", "arm", "_submission_time") if col in scoped.columns]
+    listing = scoped.sort_values(sort_cols, na_position="last") if len(scoped) and sort_cols else scoped
     if not len(listing):
         write_cell(ws, row + 2, 1, "No rows in this sheet.", fill=WHITE, align=Alignment(horizontal="left"))
-        ws.merge_cells(start_row=row + 2, start_column=1, end_row=row + 2, end_column=8)
+        ws.merge_cells(start_row=row + 2, start_column=1, end_row=row + 2, end_column=7)
     else:
         for offset, (_, rec) in enumerate(listing.iterrows()):
             submitted = rec.get("_submission_time")
@@ -250,17 +292,16 @@ def write_sheet(wb, name: str, scoped, universe_n: int, pulled_at: str):
             values = [
                 submitted,
                 rec.get("brand"),
-                rec.get("arm"),
-                rec.get("cell"),
-                QUESTION_META["S1"]["labels"].get(rec.get("S1"), "Not asked"),
-                QUESTION_META["S2"]["labels"].get(rec.get("S2"), "Not asked"),
-                QUESTION_META["S3"]["labels"].get(rec.get("S3"), "Not asked"),
+                _cell_label(rec),
+                _answer_label("S1", rec.get("S1")),
+                _answer_label("S2", rec.get("S2")),
+                _answer_label("S3", rec.get("S3")),
                 rec.get("status_reason"),
             ]
             for i, value in enumerate(values, start=1):
                 write_cell(ws, row + 2 + offset, i, value, fill=WHITE, align=Alignment(horizontal="left"))
 
-    widths = [28, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12]
+    widths = [28, 14, 14, 14, 14, 22, 42, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12]
     for i, width in enumerate(widths, start=1):
         ws.column_dimensions[get_column_letter(i)].width = width
     ws.freeze_panes = "A4"
