@@ -90,6 +90,15 @@ h2 { font-size: 28px; letter-spacing: -0.02em; }
 
 .top-meta { text-align: right; }
 
+.top-actions {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.top-actions button { margin-top: 12px; }
+
 button {
   margin-top: 12px;
   border: 1px solid var(--gold);

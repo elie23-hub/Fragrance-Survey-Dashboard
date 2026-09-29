@@ -3,13 +3,14 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, send_file
 
 ROOT = Path(__file__).resolve().parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from dashboard.data import dashboard_payload  # noqa: E402
+from export_complete_incomplete import build_workbook  # noqa: E402
 from union_kobo_surveys import load_env, redact  # noqa: E402
 
 load_env()
@@ -22,5 +23,24 @@ def dashboard():
     refresh = (request.args.get("refresh") or "0").lower() in {"1", "true", "yes"}
     try:
         return jsonify(dashboard_payload(refresh=refresh))
+    except Exception as exc:
+        return jsonify({"error": redact(exc)}), 500
+
+
+@app.get("/api/export")
+def export_xlsx():
+    try:
+        from io import BytesIO
+
+        workbook, filename, _, _ = build_workbook()
+        buffer = BytesIO()
+        workbook.save(buffer)
+        buffer.seek(0)
+        return send_file(
+            buffer,
+            as_attachment=True,
+            download_name=filename,
+            mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
     except Exception as exc:
         return jsonify({"error": redact(exc)}), 500

@@ -14,6 +14,7 @@ if str(ROOT.parent) not in sys.path:
 
 from union_kobo_surveys import load_env, redact  # noqa: E402
 from dashboard.data import dashboard_payload  # noqa: E402
+from export_complete_incomplete import build_workbook  # noqa: E402
 
 
 class DashboardHandler(SimpleHTTPRequestHandler):
@@ -44,6 +45,32 @@ class DashboardHandler(SimpleHTTPRequestHandler):
                 body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
                 self.send_response(200)
                 self.send_header("Content-Type", "application/json; charset=utf-8")
+            except Exception as exc:
+                body = json.dumps({"error": redact(exc)}).encode("utf-8")
+                self.send_response(500)
+                self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
+        if parsed.path == "/api/export":
+            try:
+                workbook, filename, _, _ = build_workbook()
+                from io import BytesIO
+
+                buffer = BytesIO()
+                workbook.save(buffer)
+                body = buffer.getvalue()
+                ascii_name = filename.encode("ascii", "ignore").decode("ascii") or "export.xlsx"
+                self.send_response(200)
+                self.send_header(
+                    "Content-Type",
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                )
+                self.send_header(
+                    "Content-Disposition",
+                    f'attachment; filename="{ascii_name}"',
+                )
             except Exception as exc:
                 body = json.dumps({"error": redact(exc)}).encode("utf-8")
                 self.send_response(500)

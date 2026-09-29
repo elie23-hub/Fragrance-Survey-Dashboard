@@ -171,4 +171,35 @@ function schedulePoll() {
 document.getElementById("reload").addEventListener("click", () => {
   load({ refresh: true }).then(schedulePoll);
 });
+
+document.getElementById("export").addEventListener("click", async () => {
+  const button = document.getElementById("export");
+  const status = document.getElementById("generated");
+  button.disabled = true;
+  status.textContent = "Building Excel from live Kobo data…";
+  try {
+    const response = await fetch("/api/export");
+    if (!response.ok) {
+      status.textContent = "Could not export Excel.";
+      return;
+    }
+    const blob = await response.blob();
+    const header = response.headers.get("Content-Disposition") || "";
+    const match = header.match(/filename="?([^"]+)"?/i);
+    const name = match ? match[1] : "Fragrance Survey (Complete - Incomplete).xlsx";
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = name;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+    status.textContent = `Downloaded ${name}`;
+  } catch {
+    status.textContent = "Could not export Excel.";
+  } finally {
+    button.disabled = false;
+  }
+});
 load().then(schedulePoll);
